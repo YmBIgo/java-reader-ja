@@ -11,7 +11,7 @@ let view: vscode.WebviewView | vscode.WebviewPanel;
 let javaReaderAssitant: JavaReader | null;
 
 export class JavaLLMReaderProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = "java-reader.SlidebarProvider";
+  public static readonly viewType = "java-reader-ja.SlidebarProvider";
   private disposables: vscode.Disposable[] = [];
   private allowedMessageType = [
     "Init",
@@ -352,7 +352,7 @@ export class JavaLLMReaderProvider implements vscode.WebviewViewProvider {
     // The JS file from the React build output
     const scriptUri = getUri(webview, this.context.extensionUri, [
       "webui",
-      "java-reader-webui",
+      "java-reader-ja-webui",
       "dist",
       "assets",
       "main.js",

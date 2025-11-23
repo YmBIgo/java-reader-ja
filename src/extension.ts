@@ -12,9 +12,9 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "java-reader" is now active!');
+	console.log('Congratulations, your extension "java-reader-ja" is now active!');
 
-	outputChannel = vscode.window.createOutputChannel("java-reader");
+	outputChannel = vscode.window.createOutputChannel("java-reader-ja");
 	context.subscriptions.push(outputChannel);
 
 	tabProvider = new JavaLLMReaderProvider(context);
@@ -22,7 +22,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const openJavaReaderInNewTab = () => {
 		const lastCol = Math.max(...vscode.window.visibleTextEditors.map((editor) => editor.viewColumn || 0));
 		const targetCol = Math.max(lastCol + 1, 1);
-		const panel = vscode.window.createWebviewPanel(JavaLLMReaderProvider.viewType, "java-reader", targetCol, {
+		const panel = vscode.window.createWebviewPanel(JavaLLMReaderProvider.viewType, "java-reader-ja", targetCol, {
 			enableScripts: true,
 			retainContextWhenHidden: true,
 			localResourceRoots: [context.extensionUri],
@@ -35,15 +35,15 @@ export function activate(context: vscode.ExtensionContext) {
 		});
 	};
 
-	context.subscriptions.push(vscode.commands.registerCommand("java-reader.openInNewTab", openJavaReaderInNewTab));
+	context.subscriptions.push(vscode.commands.registerCommand("java-reader-ja.openInNewTab", openJavaReaderInNewTab));
 
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('java-reader.helloWorld', () => {
+	const disposable = vscode.commands.registerCommand('java-reader-ja.helloWorld', () => {
 		// The code you place here will be executed every time your command is executed
 		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from java-reader!');
+		vscode.window.showInformationMessage('Hello World from java-reader-ja!');
 	});
 
 	context.subscriptions.push(disposable);

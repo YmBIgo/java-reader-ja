@@ -71,7 +71,7 @@ export async function getFunctionContentFromLineAndCharacter(
       return fileResultArray.join("\n");
     }
   }
-  console.error("error counting row...", startArrowCount, endArrowCount);
+  console.error("error counting rows...", startArrowCount, endArrowCount);
   return "";
 }
 
@@ -117,7 +117,7 @@ export async function getFileLineAndCharacterFromFunctionName(
     ? memberAccessFunction[memberAccessFunction.length - 2]
     : memberAccessFunction[memberAccessFunction.length - 1];
   const functionFirstElement = memberAccessFunction[0]
-  const isFirstDot = functionFirstElement.match(/^\s*$/g)
+  const isFirstDot = functionFirstElement.match(/^\s*$/g) && !isFirst;
   const wholeFunctionName = memberAccessFunctionName;
   const simplfiedFunctionRegexp = !memberAccessFunctionName.includes("(") && memberAccessFunction.length === 1
     ? new RegExp(`${escapeRegExp(wholeFunctionName + "(")}`)
@@ -173,13 +173,17 @@ export async function getFileLineAndCharacterFromFunctionName(
       }
     }
     let functionIndex = row.search(simplfiedFunctionRegexp);
-    if (functionIndex >= 0) {
-      functionIndex += 1;
-    }
+    // if (functionIndex >= 0) {
+    //   functionIndex += 1;
+    // }
     if (isFirstDot) {
       functionIndex += 1;
     }
     if (functionIndex >= 0) {
+      // 最初の登録時は、必ず一行まるまる貼ってもらう想定なので、0固定で大丈夫。
+      if (isFirst){
+        functionIndex = 0;
+      }
       return [index, functionIndex];
     }
   }

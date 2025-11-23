@@ -34,9 +34,9 @@ vscode 1.100.0以上のものをインストールしてください
 
 3. JavaReader のインストール
 
-vs code で [download](https://marketplace.visualstudio.com/items?itemName=coffeecupjapan.java-reader&ssr=false#overview) してください。
+vs code で [download](https://marketplace.visualstudio.com/items?itemName=coffeecupjapan.java-reader-ja&ssr=false#overview) してください。
 
-https://marketplace.visualstudio.com/items?itemName=coffeecupjapan.java-reader&ssr=false#overview 
+https://marketplace.visualstudio.com/items?itemName=coffeecupjapan.java-reader-ja&ssr=false#overview 
 
 4. VS拡張機能を開く
 

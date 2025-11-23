@@ -10,7 +10,7 @@ import {
 import { ChoiceTree, HistoryHandler, ProcessChoice } from "./history";
 import { LLMModel } from "./llm/model";
 import { Message, MessageType } from "./type/Message";
-import {Symbol} from "./type/Symbol";
+import { Symbol } from "./type/Symbol";
 import {
   getFileLineAndCharacterFromFunctionName,
   getFunctionContentFromLineAndCharacter,
@@ -27,7 +27,8 @@ import {
   reportPromopt,
   searchFolderSystemPrompt,
   searchSymbolSystemPrompt,
-} from "./prompt";
+  stepPrompt
+} from "./prompt/index_ja";
 import pWaitFor from "p-wait-for";
 import { is7wordString } from "./util/number";
 import { DocumentSymbol, SymbolInformation } from "vscode-languageclient/node";
@@ -205,7 +206,7 @@ export class JavaReader {
         });
     } else {
       client = new JavaLanguageClient(
-        `Java Reader`,
+        `JavaReaderJP`,
         serverOptions,
         clientOptions
       );
@@ -360,7 +361,7 @@ ${filteredPickFunctions}
       );
     if (currentLine === -1 && currentCharacter === -1) {
       this.sendErrorSocket(
-        `Can not find content below. ${currentFunctionName} @ ${currentFilePath}...`
+        `以下の内容は見つかりませんでした ${currentFunctionName} @ ${currentFilePath}...`
       );
     }
     const functionCodeContent = await getFunctionContentFromLineAndCharacter(currentFilePath, currentLine, currentCharacter);
@@ -378,13 +379,13 @@ ${filteredPickFunctions}
     if (historyTree) {
       this.saySocket(historyTree);
     }
-    const question = "Input hash value of past history which you want to search from.";
+    const question = "過去の履歴の中から検索したいハッシュ値を入力してください。";
     const result = await this.askSocket(question);
     if (is7wordString(result.ask)) {
       await this.runIntercativeHistoryPoint(result.ask);
       return;
     }
-    this.sendErrorSocket("Can not find hash value. Please try again.");
+    this.sendErrorSocket("ハッシュ値が見つかりませんでした。再度閉じて再試行してください");
   }
 
   async runFirstTask(
@@ -403,7 +404,7 @@ ${filteredPickFunctions}
       );
     if (currentLine === -1 && currentCharacter === -1) {
       this.sendErrorSocket(
-        `Can not find content of ${currentFunctionName} @ ${currentFilePath}...`
+        `以下の内容は見つかりませんでした ${currentFunctionName} @ ${currentFilePath}...`
       );
     }
     const functionCodeContent = await getFunctionContentFromLineAndCharacter(
@@ -439,13 +440,50 @@ ${filteredPickFunctions}
     } catch (e) {
       console.error(e);
       this.sendErrorSocket(
-        `Can not find content of ${currentFilePath}@${currentLine}:${currentCharacter}`
+        `以下の内容は見つかりませんでした ${currentFilePath}@${currentLine}:${currentCharacter}`
       );
       return;
     }
     this.runTask(currentFilePath, functionContent);
   }
   private async runTask(currentFilePath: string, functionContent: string) {
+    this.saySocket("まずは関数の動作ステップを解析します...");
+    const userStepPrompt = `
+\`\`\`code
+${functionContent}
+\`\`\``;
+    const stepHistory: Anthropic.Messages.MessageParam[] = [
+      { role: "user", content: userStepPrompt },
+    ];
+    let stepResponseJson;
+    try {
+      const response = (await this.apiHandler?.createMessage(
+        stepPrompt,
+        stepHistory,
+        true
+      )) ?? "{}"
+      stepResponseJson = JSON.parse(response);
+    } catch (e) {
+      console.error(e);
+      this.sendErrorSocket(`APIエラー`);
+      this.saveChoiceTree();
+      return;
+    }
+    if (!Array.isArray(stepResponseJson)) {
+      console.error("respond JSON format is not Array...");
+      this.sendErrorSocket(`返ってきた情報が間違っています...`);
+      this.saveChoiceTree();
+      return;
+    }
+    let stepDetails: string = "以下が関数の動作ステップです。\n----------------------------\n";
+    let stepActions: string = "";
+    stepResponseJson.forEach((s) => {
+      if (!s) return;
+      stepDetails += `${s.step} : ${s.action}\n${s.details}\n\n`;
+      stepActions += `${s.step}\n${s.action}\n\n`
+    });
+    this.saySocket(`${stepDetails}`);
+    this.saySocket("次にジャンプする関数候補を出します...");
     const userPrompt = `
 \`\`\`purpose
 ${this.purpose}
@@ -453,6 +491,10 @@ ${this.purpose}
 
 \`\`\`code
 ${functionContent}
+\`\`\`
+
+\`\`\`steps
+${stepActions}
 \`\`\``;
     console.log(userPrompt);
     const history: Anthropic.Messages.MessageParam[] = [
@@ -469,13 +511,13 @@ ${functionContent}
       responseJSON = JSON.parse(response);
     } catch (e) {
       console.error(e);
-      this.sendErrorSocket(`API Error`);
+      this.sendErrorSocket(`APIエラー`);
       this.saveChoiceTree();
       return;
     }
     if (!Array.isArray(responseJSON)) {
       console.error("respond JSON format is not Array...");
-      this.sendErrorSocket(`Returned information is wrong...`);
+      this.sendErrorSocket(`返ってきた情報が間違っています...`);
       this.saveChoiceTree();
       return;
     }
@@ -573,26 +615,36 @@ ${functionContent}
       askQuestion += `Whole Code Line : ${fileCodeLine}\n`;
       askQuestion += `Original Code : ${each_r.code_line}\n`;
       askQuestion += `Confidence : ${each_r.score}\n`;
+      if (!isNaN(Number(each_r.step)) && stepResponseJson[Number(each_r.step - 1)]) {
+        askQuestion += `Step : ${each_r.step} ${stepResponseJson[Number(each_r.step - 1)].action}\n`;
+      }
       askQuestion += `----------------------------\n`;
       newHistoryChoices.push({
         functionName: each_r.name,
         functionCodeLine: fileCodeLine,
         originalFilePath: currentFilePath,
+        comment: each_r.score + " | " + each_r.description,
       });
     });
     let resultNumber = 0;
     let result: AskResponse | null = null;
+    const oldPosition = this.historyHanlder?.getCurrentChoicePosition();
+    this.historyHanlder?.addHistory(newHistoryChoices);
+    if (oldPosition && oldPosition.length) {
+      this.historyHanlder?.move(oldPosition);
+    }
     this.saySocket(`${askQuestion}`);
     for (; ;) {
-      result = await this.askSocket(`Please enter the index you want to display:
-- Enter 5 to retry
-- Enter 6 to display the history as a tree structure
-- Enter 7 to generate an exploration report
-- Enter 8 to display the current file
-- Enter 9 to generate a Mermaid diagram of the current function
-- Enter 10 to detect potential bugs
-- Enter 11 to save the history so far as JSON
-※ If you enter a string, it will be interpreted as a hash value to search the past history.`);
+      result = await this.askSocket(`
+表示したい詳細のインデックス（0〜4）を入力してください。
+  - 5 を入力すると再試行できます
+  - 6 を入力すると履歴を木構造で表示します
+  - 7 を入力すると探索レポートを生成します
+  - 8 を入力すると現在のファイルを表示します
+  - 9 を入力すると現在の関数のマーメイド図を生成します
+  - 10 を入力すると疑わしいバグを検出します
+  - 11 を入力するとここまでの履歴をJSONで保存します
+※ 文字列を入力すると、過去の履歴を検索するハッシュ値として認識されます`);
       console.log(`result : ${result.ask}`);
       resultNumber = Number(result.ask);
       const newMessages = this.addMessages(`User Enter ${result.ask}`, "user");
@@ -634,6 +686,11 @@ ${functionContent}
       }
     }
     if (is7wordString(result.ask)) {
+      const isHistoryInteractive = await this.askSocket("最初から順番に再現したい場合はyesを、該当箇所のみ見たい場合は任意の文字を入力してください");
+      if (isHistoryInteractive.ask === "yes") {
+        await this.runIntercativeHistoryPoint(result.ask);
+        return;
+      }
       await this.runHistoryPoint(result.ask);
       return;
     }
@@ -643,13 +700,13 @@ ${functionContent}
     }
     if (!responseJSON[resultNumber]) {
       this.sendErrorSocket(
-        `Your choice "${resultNumber}" is not valid choice`
+        `あなたの選択肢 ${resultNumber} は正しい選択肢ではありません`
       );
       return;
     }
     this.historyHanlder?.addHistory(newHistoryChoices);
     this.saySocket(
-      `Jdtls is searching "${responseJSON[resultNumber].name}"`
+      `Jdtlsは "${responseJSON[resultNumber].name}" を検索しています`
     );
     const [searchLine, searchCharacter] =
       await getFileLineAndCharacterFromFunctionName(
@@ -660,7 +717,7 @@ ${functionContent}
         responseJSON[resultNumber].second_code_line,
       );
     if (searchLine === -1 && searchCharacter === -1) {
-      this.sendErrorSocket(`Failed while searching files.`);
+      this.sendErrorSocket(`ファイルの内容の検索中に失敗しました`);
       this.saveChoiceTree();
       return;
     }
@@ -679,15 +736,17 @@ ${functionContent}
         return newHc;
       } 
       return hc
-    });
+    })
+    // historyのパスは検索後に確定する
     this.historyHanlder?.addHistory(newHistoryChoices);
     this.jumpToCode(removeFilePrefixFromFilePath(newFile), newFunctionContent);
-    const comment = await this.askSocket("If you have any comments write it down.\nIf you have no comment please just write 'no comment'.");
-    const newMessages = this.addMessages(`User Enter ${comment.ask}`, "user");
-    this.sendState(newMessages);
-    this.historyHanlder?.choose(resultNumber, newFunctionContent, comment.ask);
+    this.historyHanlder?.choose(
+      resultNumber,
+      newFunctionContent,
+      responseJSON[resultNumber].score + " | " + responseJSON[resultNumber].description
+    );
     this.saySocket(
-      `LLM is searching ${newFile}@${newLine}:${newCharacter}.`
+      `LLMは ${newFile}@${newLine}:${newCharacter} を検索しています`
     );
     this.runTask(removeFilePrefixFromFilePath(newFile), newFunctionContent);
   }
@@ -730,20 +789,24 @@ ${functionContent}
     const searchResult = this.historyHanlder?.searchTreeByIdPublic(historyHash);
     if (!searchResult) {
       this.sendErrorSocket(
-        `Can not find hash value of selected search history. ${historyHash}`
+        `hash値と一致する履歴が見つかりませんでした... ${historyHash}`
       );
       this.saveChoiceTree();
       return;
     }
     for (let i = 0; i < searchResult.pos.length; i++) {
+      if (searchResult.pos.length === i + 1) {
+        break;
+      }
       const pos = searchResult.pos.slice(0, i + 1);
       const currentRunConfig = this.historyHanlder?.getContentFromPos(pos);
       if (!currentRunConfig) {
-        this.saySocket(`Can not find content positioned at ${pos.length} ${pos[pos.length - 1].depth}:${pos[pos.length - 1].width}`);
+        this.saySocket(`以下のポジションにある内容が見つかりませんでした... ${pos.length} ${pos[pos.length - 1].depth}:${pos[pos.length - 1].width}`);
         continue;
       }
       const { functionCodeContent, functionCodeLine, functionName, originalFilePath, id } = currentRunConfig;
       let functionResult = functionCodeContent;
+      let filePath = originalFilePath;
       if (!functionCodeContent) {
         const [line, character] = await getFileLineAndCharacterFromFunctionName(originalFilePath, functionCodeLine, functionName);
         if (line === -1 && character === -1) {
@@ -755,27 +818,33 @@ ${functionContent}
         }
         const [newFile, , , newFileContent] = await this.queryJdtls(originalFilePath, line, character);
         if (!newFile) {
-          console.error("Gopls fails to search file");
-          this.sendErrorSocket("Gopls fails to search file");
+          this.sendErrorSocket("Ruby-Lspはファイル検索に失敗しました");
           this.saveChoiceTree();
           return;
         }
         functionResult = newFileContent;
+        filePath = removeFilePrefixFromFilePath(newFile);
       }
-      const foundCallback = (st: ChoiceTree) => {
+      let comment: string = "";
+      const foundCallback = (st: ChoiceTree, comment2: string) => {
         st.content.functionCodeContent = functionResult ?? functionCodeLine;
+        if (st.content.comment) comment = comment2;
+        if (filePath !== originalFilePath) st.content.originalFilePath = filePath;
       }
       this.historyHanlder?.moveById(id.slice(0, 7), foundCallback);
       if (searchResult.pos.length === i + 1) {
         break;
       }
       if (functionResult) {
-        this.saySocket("Jump to the selected code ...")
-        this.jumpToCode(originalFilePath, functionResult);
+        this.saySocket("選択されたコードにジャンプします ...")
+        this.jumpToCode(filePath, functionResult);
+      }
+      if (comment) {
+        this.saySocket(comment);
       }
       let resultString = ""
-      for(;;) {
-        const result = await this.askSocket("Please Enter 1 when you want to jump to the next function.");
+      for (; ;) {
+        const result = await this.askSocket("もし次の関数にジャンプする場合は、1を入力してください");
         if (parseInt(result.ask) === 1) {
           resultString = "1"
           break;
@@ -791,15 +860,20 @@ ${functionContent}
     const newRunConfig = this.historyHanlder?.moveById(historyHash);
     if (!newRunConfig) {
       this.sendErrorSocket(
-        `Can not find hash value of selected search history. ${historyHash}`
+        `指定された検索履歴のhash値が見つかりませんでした ${historyHash}`
       );
       this.saveChoiceTree();
       return;
     }
     const { functionCodeContent, functionCodeLine, functionName, originalFilePath } = newRunConfig;
     let functionResult = functionCodeContent;
+    let filePath = originalFilePath;
     if (!functionCodeContent) {
-      const [line, character] = await getFileLineAndCharacterFromFunctionName(originalFilePath, functionCodeLine, functionName);
+      const [line, character] = await getFileLineAndCharacterFromFunctionName(
+        originalFilePath,
+        functionCodeLine,
+        functionName,
+      );
       if (line === -1 && character === -1) {
         this.sendErrorSocket(
           `Can not find function of selected search history. ${historyHash}`
@@ -814,19 +888,25 @@ ${functionContent}
         this.saveChoiceTree();
         return;
       }
+      filePath = removeFilePrefixFromFilePath(newFile);
       functionResult = newFileContent;
     }
-    const foundCallback = (st: ChoiceTree) => {
+    let comment: string = "";
+    const foundCallback = (st: ChoiceTree, comment2: string) => {
       st.content.functionCodeContent = functionResult ?? functionCodeLine;
+      if (st.content.comment) comment = comment2;
+      if (filePath !== originalFilePath) st.content.originalFilePath = filePath;
     }
     this.historyHanlder?.moveById(historyHash, foundCallback);
-    this.runTask(originalFilePath, functionResult ?? functionCodeLine);
+    if (comment) this.saySocket(comment);
+    await this.jumpToCode(filePath, functionResult ?? functionCodeLine);
+    this.runTask(filePath, functionResult ?? functionCodeLine);
   }
 
   private async getReport() {
     const r = this.historyHanlder?.traceFunctionContent();
     if (!r) {
-      this.sendErrorSocket(`Fail to get report.`);
+      this.sendErrorSocket(`レポート取得に失敗しました`);
       return;
     }
     const [result, functionResult] = r;
@@ -869,15 +949,15 @@ ${functionContent}
   }
   private async getBugsReport() {
     const description = await this.askSocket(
-      `Write any thought about potential bugs.（If you don't have ideas just enter "no"）`
+      `読んでいるコードと関連する怪しい挙動があるなら書いてください（無ければnoと書いてください）`
     );
     const r = this.historyHanlder?.traceFunctionContent();
     if (!r) {
-      this.sendErrorSocket(`Fail to get Bug Report.`);
+      this.sendErrorSocket(`バグレポート取得に失敗しました...`);
       return;
     }
     const [result, functionResult] = r;
-    this.saySocket(`Searching bugs related to "${functionResult}"`);
+    this.saySocket(`"${functionResult}"と関連するバグを探しています`);
     const userPrompt = `<functions or methods>
 ${result}
 <the potential bugs (optional)>
@@ -892,7 +972,7 @@ ${description.ask ? description.ask : "not provided..."}
     const fileName = `bugreport_${Date.now()}.txt`;
     await fs.writeFile(`${this.saveReportFolder}/${fileName}`, response + "\n\n" + result);
     this.saySocket(response);
-    this.saySocket(`Generate Bugs Report Done! File is created @${this.saveReportFolder}/${fileName}`);
+    this.saySocket(`バグレポートは以下の場所に保存されました @${this.saveReportFolder}/${fileName}`);
   }
   private async saveChoiceTree() {
     const choiceTreeWithAdditionalInfo = {
@@ -911,8 +991,34 @@ ${description.ask ? description.ask : "not provided..."}
       choiceTreeString
     );
     this.saySocket(
-      `Search history related to "${this.saveReportFolder}/${fileName}" is saved to your local path.`
+      `ここまでの調査履歴が "${this.saveReportFolder}/${fileName}" に保存されました`
     );
+  }
+
+  private async doQueryReferencesJdtls(
+    filePath: string,
+    line: number,
+    character: number
+  ): Promise<[string, any, boolean]> {
+    let itemString = "";
+    await client?.sendRequest("textDocument/references", {
+      textDocument: {
+        uri: addFilePrefixToFilePath(filePath)
+      },
+      position: { line, character }
+    })
+      .then((result) => {
+        console.log("reference result : ", result);
+        itemString = JSON.stringify(result);
+      });
+    try {
+      const item = JSON.parse(itemString as any);
+      return [itemString, item, true]
+    } catch (e) {
+      console.error(e);
+      this.saveChoiceTree();
+      return [itemString, [], false]
+    }
   }
 
   private async doQueryJdtls(
@@ -925,6 +1031,7 @@ ${description.ask ? description.ask : "not provided..."}
     console.log(line, character);
     let itemString: string = "";
     const fileContent = await fs.readFile(filePath, "utf-8");
+    let isReference = false;
     await pWaitFor(() => !!this.isJdtlsRunning(), {
       interval: 500,
     });
@@ -955,14 +1062,25 @@ ${description.ask ? description.ask : "not provided..."}
       item = JSON.parse(itemString as any);
     } catch (e) {
       console.error(e);
-      this.saveChoiceTree();
+      [itemString, item, isReference] = await this.doQueryReferencesJdtls(filePath, line, character)
     }
     if (!Array.isArray(item) || item.length <= 0) {
-      console.log("item not array", item);
-      return ["", 0, 0, item];
+      [itemString, item, isReference] = await this.doQueryReferencesJdtls(filePath, line, character)
+      if (!Array.isArray(item) || item.length <= 0) {
+        console.log("item not array", item);
+        return ["", 0, 0, item];
+      }
     }
-    const firstItem = (requestType.includes("implementation") && item.length > 1) ? item[1] : item[0];
-    const file = firstItem.uri;
+    console.log(item);
+    const firstItem = item.filter((i) => {
+      const isUri = isReference ? i.uri?.includes(this.rootPath) : i.targetUri?.includes(this.rootPath);
+      return isUri
+    })?.[0];
+    if (!firstItem) {
+      // codes are outside the main codebase.
+      return ["", 0, 0, []]
+    }
+    const file = isReference ? firstItem.uri : firstItem.targetUri;
     await client?.sendNotification("textDocument/didClose", {
       textDocument: {
         uri: addFilePrefixToFilePath(filePath),
@@ -973,8 +1091,12 @@ ${description.ask ? description.ask : "not provided..."}
     });
     return [
       file,
-      firstItem.range.start.line,
-      firstItem.range.start.character,
+      isReference 
+      ? firstItem.range.start.line
+      : firstItem.targetRange.start.line,
+      isReference
+      ? firstItem.range.start.character
+      : firstItem.targetRange.start.character,
       item,
     ];
   }

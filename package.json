@@ -1,6 +1,6 @@
 {
-  "name": "java-reader",
-  "displayName": "java-reader",
+  "name": "java-reader-ja",
+  "displayName": "java-reader-ja",
   "description": "LLM tool which aim to read large java codebase",
   "version": "1.0.6",
   "type": "commonjs",
@@ -15,25 +15,25 @@
   "publisher": "coffeecupjapan",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YmBIgo/java-reader"
+    "url": "https://github.com/YmBIgo/java-reader-ja"
   },
   "categories": [
     "Other"
   ],
   "activationEvents": [
-    "onCommand:java-reader.helloWorld",
-    "onCommand:java-reader.openInNewTab"
+    "onCommand:java-reader-ja.helloWorld",
+    "onCommand:java-reader-ja.openInNewTab"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "java-reader.helloWorld",
+        "command": "java-reader-ja.helloWorld",
         "title": "Hello World"
       },
       {
-        "command": "java-reader.openInNewTab",
-        "title": "Open java-reader Tab"
+        "command": "java-reader-ja.openInNewTab",
+        "title": "Open java-reader-ja Tab"
       }
     ]
   },

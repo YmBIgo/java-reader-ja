@@ -35,9 +35,9 @@ Please install version 1.100.0 or later of Visual Studio Code.
 
 3. Install JavaReader
 
-Download java-reader at [vscode store](https://marketplace.visualstudio.com/items?itemName=coffeecupjapan.java-reader&ssr=false#overview).
+Download java-reader-ja at [vscode store](https://marketplace.visualstudio.com/items?itemName=coffeecupjapan.java-reader-ja&ssr=false#overview).
 
-https://marketplace.visualstudio.com/items?itemName=coffeecupjapan.java-reader&ssr=false#overview 
+https://marketplace.visualstudio.com/items?itemName=coffeecupjapan.java-reader-ja&ssr=false#overview 
 
 4. Open the Extension
 Once downloaded, open the Command Palette with Command + Shift + P, and click “Open Java Reader Tab”. If a tab opens on the right side, it was successful.
