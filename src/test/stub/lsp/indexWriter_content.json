@@ -1,0 +1,16 @@
+[
+    {
+        "line": 1520,
+        "character": 14,
+        "functionName": "addDocuments",
+        "firstLine": "  public long addDocuments(Iterable<? extends Iterable<? extends IndexableField>> docs)",
+        "functionContent": "  public long addDocuments(Iterable<? extends Iterable<? extends IndexableField>> docs)\n      throws IOException {\n    return updateDocuments((DocumentsWriterDeleteQueue.Node<?>) null, docs);\n  }"
+    },
+    {
+        "line": 1537,
+        "character": 14,
+        "functionName": "updateDocuments",
+        "firstLine": "  public long updateDocuments(",
+        "functionContent": "  public long updateDocuments(\n      Term delTerm, Iterable<? extends Iterable<? extends IndexableField>> docs)\n      throws IOException {\n    return updateDocuments(\n        delTerm == null ? null : DocumentsWriterDeleteQueue.newNode(delTerm), docs);\n  }"
+    }
+]

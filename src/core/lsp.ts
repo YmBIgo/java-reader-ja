@@ -169,6 +169,7 @@ export async function getFileLineAndCharacterFromFunctionName(
     if (secondCodeLine) {
       const nextRow = fileContentArray[index + 1];
       if (nextRow && !nextRow.includes(secondCodeLine)) {
+        console.log("second code line check.")
         continue;
       }
     }

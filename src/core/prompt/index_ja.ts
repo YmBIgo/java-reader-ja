@@ -11,7 +11,7 @@ export const pickCandidatePromopt = `
 
 ルール
 
-- ユーザーはあなたに「Javaコードリーディングの目的」「今見ている関数の内容」「関数の動作ステップ」を提供します。それに対してあなたは、JSON形式で１〜５個の「目的に最も関連する関数名」「その関数を含む１行」「説明」「どれくらい関連しているかを100点満点で自己採点した結果」「対応する関数のステップ」を返します
+- ユーザーはあなたに「Javaコードリーディングの目的」「今見ている関数の内容」「関数の動作ステップ」を提供します。それに対してあなたは、JSON形式で１〜５個の「目的に最も関連する関数名」「その関数を含む１行」「説明」「どれくらい関連しているかを100点満点で自己採点した結果」「対応する関数のステップ」「その関数を含む１行の次の行」を返します
 
 [例]
 
@@ -96,38 +96,43 @@ DWPT の再利用可否を判定してロック解除
 [
 {
     "name": "dwpt.updateDocuments",
-    "code_line": "        seqNo =\n            dwpt.updateDocuments(docs, delNode, flushNotifications, numDocsInRAM::incrementAndGet);",
+    "code_line": "            dwpt.updateDocuments(docs, delNode, flushNotifications, numDocsInRAM::incrementAndGet);",
     "description": "スレッド専用の DocumentsWriterPerThread が、受け取った docs を実際のインデックス構造に反映し、シーケンス番号を発行する中核処理です。ドキュメントの追加・更新ロジックそのものがここに集約されていると考えられ、Lucene における「ドキュメント追加パス」の本体に最も近い関数です。",
     "score": 100,
-    "step": 4
+    "step": 4,
+    "second_code_line": "      } finally {"
 },
 {
     "name": "updateDocuments",
-    "code_line": "  long updateDocuments(\n      final Iterable<? extends Iterable<? extends IndexableField>> docs,\n      final DocumentsWriterDeleteQueue.Node<?> delNode)\n      throws IOException {",
+    "code_line": "  long updateDocuments(",
     "description": "IndexWriter 側から見た「複数ドキュメントの追加・更新」のオーケストレーションを担うメソッドです。DWPT のロック取得、更新処理呼び出し、フラッシュ判定、後処理（pre/postUpdate）など、ドキュメント追加パス全体のライフサイクルを管理しています。",
     "score": 95,
-    "step": 1
+    "step": 1,
+    "second_code_line": "      final Iterable<? extends Iterable<? extends IndexableField>> docs,"
 },
 {
     "name": "flushControl.doAfterDocument",
     "code_line": "      flushingDWPT = flushControl.doAfterDocument(dwpt);",
     "description": "1ドキュメント（もしくはバッチ）の追加・更新が完了したあとに、RAM の使用量やドキュメント数などをもとに「この DWPT をフラッシュすべきか」を判断する役割の関数です。メモリ上に積まれた追加ドキュメントが、実際のセグメントとしてディスクに書き出されるタイミングに強く関係します。",
     "score": 88,
-    "step": 5
+    "step": 5,
+    "second_code_line": "    } finally {"
 },
 {
     "name": "postUpdate",
     "code_line": "    if (postUpdate(flushingDWPT, hasEvents)) {",
     "description": "更新処理の後半で呼び出されるフックで、flushingDWPT の有無や hasEvents（更新イベントの状態）にもとづき、実際にフラッシュ処理やイベント処理を進める役割を担います。戻り値に応じて seqNo の符号が反転されるため、「この更新に追加的な意味付けがあるか」を示す重要な後処理ポイントです。",
     "score": 80,
-    "steps": 7
+    "steps": 7,
+    "second_code_line": "      seqNo = -seqNo;"
 },
 {
     "name": "preUpdate",
     "code_line": "    boolean hasEvents = preUpdate();",
     "description": "ドキュメント更新が始まる直前に呼び出される準備用フックで、削除キューやイベントキューの状態を確認し、今回の更新で処理すべきイベントがあるか（hasEvents）を判定します。updateDocuments 全体の前後で一貫した状態管理を行うための入口となる関数です。",
     "score": 75,
-    "steps": 1
+    "steps": 1,
+    "second_code_line": ""
 }
 ]
 \`\`\`

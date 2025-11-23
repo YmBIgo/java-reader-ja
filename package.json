@@ -2,7 +2,7 @@
   "name": "java-reader-ja",
   "displayName": "java-reader-ja",
   "description": "LLM tool which aim to read large java codebase",
-  "version": "1.0.6",
+  "version": "1.0.1",
   "type": "commonjs",
   "icon": "logo.png",
   "engines": {

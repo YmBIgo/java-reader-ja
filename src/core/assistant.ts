@@ -714,7 +714,7 @@ ${stepActions}
         responseJSON[resultNumber].code_line,
         responseJSON[resultNumber].name,
         false,
-        responseJSON[resultNumber].second_code_line,
+        responseJSON[resultNumber].second_code_line
       );
     if (searchLine === -1 && searchCharacter === -1) {
       this.sendErrorSocket(`ファイルの内容の検索中に失敗しました`);
@@ -818,7 +818,7 @@ ${stepActions}
         }
         const [newFile, , , newFileContent] = await this.queryJdtls(originalFilePath, line, character);
         if (!newFile) {
-          this.sendErrorSocket("Ruby-Lspはファイル検索に失敗しました");
+          this.sendErrorSocket("Jdtlsはファイル検索に失敗しました");
           this.saveChoiceTree();
           return;
         }
@@ -1072,15 +1072,15 @@ ${description.ask ? description.ask : "not provided..."}
       }
     }
     console.log(item);
-    const firstItem = item.filter((i) => {
-      const isUri = isReference ? i.uri?.includes(this.rootPath) : i.targetUri?.includes(this.rootPath);
+    let firstItem = item.filter((i) => {
+      const isUri = i.uri?.includes(this.rootPath); // : i.targetUri?.includes(this.rootPath);
       return isUri
     })?.[0];
     if (!firstItem) {
       // codes are outside the main codebase.
-      return ["", 0, 0, []]
+      firstItem = item[0];
     }
-    const file = isReference ? firstItem.uri : firstItem.targetUri;
+    const file = firstItem.uri;
     await client?.sendNotification("textDocument/didClose", {
       textDocument: {
         uri: addFilePrefixToFilePath(filePath),
@@ -1091,12 +1091,8 @@ ${description.ask ? description.ask : "not provided..."}
     });
     return [
       file,
-      isReference 
-      ? firstItem.range.start.line
-      : firstItem.targetRange.start.line,
-      isReference
-      ? firstItem.range.start.character
-      : firstItem.targetRange.start.character,
+      firstItem.range.start.line,
+      firstItem.range.start.character,
       item,
     ];
   }
