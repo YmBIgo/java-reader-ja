@@ -1,6 +1,13 @@
 ## Java Reader とは？
 Java Reader とは、LLMと一緒にJavaのコードを読むためのツールです。
 
+#### Important Update
+
+生成したJSONを可視化できる Playgroundを作成しました。
+よかったら使ってみて下さい！
+
+https://d1bn7mo12i1l5l.cloudfront.net/input
+
 #### [できること]
 - 人がコードを読まずともLLMが関数探索してくれる
 - 前に進んだ関数経路に戻れる
@@ -53,6 +60,10 @@ jdtlsのパス、LLM（OpenAI・Claude・Plamo・Gemini）を入力
 探索を開始すると、LLMが現在の関数の中から重要な関数を推薦してくれます。なのであなたはその中から重要そうな次に探索したい関数を選びます。このプロセスはあなたがいいと思うまで続け、探索を続けます。
 
 ## Release Notes
+
+#### 1.0.2
+
+OpenAIモデルの追加とPlayGroundの告知
 
 #### 1.0.1
 

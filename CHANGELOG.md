@@ -4,6 +4,10 @@ All notable changes to the "java-reader-ja" extension will be documented in this
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+### 1.0.2
+
+- OpenAIモデルの追加とPlayGroundの告知
+
 ### 1.0.1
 
 - First Commit
