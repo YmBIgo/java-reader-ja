@@ -61,6 +61,10 @@ jdtlsのパス、LLM（OpenAI・Claude・Plamo・Gemini）を入力
 
 ## Release Notes
 
+#### 1.0.3
+
+OpenAIモデルの追加
+
 #### 1.0.2
 
 OpenAIモデルの追加とPlayGroundの告知
